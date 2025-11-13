@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escenarios Electorales - Parlamento (Hemiciclo)</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f4f4f4;
+    text-align: center;
+  }
+  h1 { color: #333; }
+  section {
+    background: white;
+    padding: 1em 2em;
+    margin: 1em auto;
+    border-radius: 8px;
+    max-width: 80%;
+  }
+  label { display: block; margin-top: 0.5em; }
+  input, select { margin-left: 0.5em; width: 60px; }
+  .resultados { font-weight: bold; }
+  .error { color: red; font-weight: bold; }
+
+  #hemiciclo {
+    position: relative;
+    width: 500px;
+    height: 260px;
+    margin: 30px auto;
+    background: #eef2f6;
+    border-radius: 250px 250px 0 0; /* curvado hacia arriba */
+    overflow: hidden;
+  }
+
+  .banca {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: background 0.5s ease;
+  }
+</style>
+</head>
+<body>
+
+<h1>Calculadora de Escenarios Electorales</h1>
+
+<section>
+  <h2>Totales base</h2>
+  <p>LT: <strong>123</strong> | LD: <strong>53</strong></p>
+  <p>Indeterminados FM: <strong>47</strong> | MNR: <strong>20</strong> | Otros: <strong>25</strong></p>
+</section>
+
+<section>
+  <h2>Escenario de indecisos</h2>
+
+  <label>
+    INDETERMINADOS FM:
+    <select id="fm-escenario">
+      <option value="lt">Todos a LT</option>
+      <option value="ld">Todos a LD</option>
+      <option value="divididos">Divididos (16 a LD, resto a LT)</option>
+    </select>
+  </label>
+
+  <label>MNR a LT: <input type="number" id="mnr-lt" value="10" min="0" max="20"></label>
+  <label>MNR a LD: <input type="number" id="mnr-ld" value="10" readonly></label>
+
+  <label>Otros a LT: <input type="number" id="otros-lt" value="12" min="0" max="25"></label>
+  <label>Otros a LD: <input type="number" id="otros-ld" value="13" readonly></label>
+
+  <p id="error-msg" class="error"></p>
+  <button id="calcular">Calcular resultado</button>
+</section>
+
+<section>
+  <h2>Resultados</h2>
+  <p class="resultados">LT total: <span id="lt-total">0</span> (<span id="lt-porc">0</span>%)</p>
+  <p class="resultados">LD total: <span id="ld-total">0</span> (<span id="ld-porc">0</span>%)</p>
+  <p class="resultados">Total de votos: <span id="total-votos">0</span></p>
+  <p id="ganador"></p>
+
+  <div id="hemiciclo"></div>
+</section>
+
+<script>
+const baseLT = 123;
+const baseLD = 53;
+const indecFM = 47;
+const totalMNR = 20;
+const totalOtros = 25;
+const totalBancas = 268;
+
+// Inputs
+const mnrLTInput = document.getElementById("mnr-lt");
+const mnrLDInput = document.getElementById("mnr-ld");
+const otrosLTInput = document.getElementById("otros-lt");
+const otrosLDInput = document.getElementById("otros-ld");
+const errorMsg = document.getElementById("error-msg");
+
+// Forzar que MNR y Otros sumen exactamente el total
+function actualizarMNR() {
+  let lt = parseInt(mnrLTInput.value) || 0;
+  lt = Math.min(Math.max(lt, 0), totalMNR);
+  mnrLTInput.value = lt;
+  mnrLDInput.value = totalMNR - lt;
+}
+
+function actualizarOtros() {
+  let lt = parseInt(otrosLTInput.value) || 0;
+  lt = Math.min(Math.max(lt, 0), totalOtros);
+  otrosLTInput.value = lt;
+  otrosLDInput.value = totalOtros - lt;
+}
+
+// Listeners
+mnrLTInput.addEventListener("input", actualizarMNR);
+mnrLDInput.addEventListener("input", actualizarMNR);
+otrosLTInput.addEventListener("input", actualizarOtros);
+otrosLDInput.addEventListener("input", actualizarOtros);
+
+// Inicializamos
+actualizarMNR();
+actualizarOtros();
+
+// Calcular resultados
+document.getElementById("calcular").addEventListener("click", () => {
+  const fmEscenario = document.getElementById("fm-escenario").value;
+  const mnrLT = parseInt(mnrLTInput.value) || 0;
+  const mnrLD = parseInt(mnrLDInput.value) || 0;
+  const otrosLT = parseInt(otrosLTInput.value) || 0;
+  const otrosLD = parseInt(otrosLDInput.value) || 0;
+
+  let lt = baseLT, ld = baseLD;
+  if (fmEscenario === "lt") lt += indecFM;
+  else if (fmEscenario === "ld") ld += indecFM;
+  else { ld += 16; lt += indecFM - 16; }
+
+  lt += mnrLT + otrosLT;
+  ld += mnrLD + otrosLD;
+
+  const total = lt + ld;
+  const ltPorc = ((lt / total) * 100).toFixed(1);
+  const ldPorc = ((ld / total) * 100).toFixed(1);
+
+  document.getElementById("lt-total").textContent = lt;
+  document.getElementById("ld-total").textContent = ld;
+  document.getElementById("total-votos").textContent = total;
+  document.getElementById("lt-porc").textContent = ltPorc;
+  document.getElementById("ld-porc").textContent = ldPorc;
+  document.getElementById("ganador").textContent = lt > ld ? "🏆 Gana LT" : (ld > lt ? "🏆 Gana LD" : "🤝 Empate");
+
+  dibujarHemiciclo(lt, ld, total);
+});
+
+// Dibujar hemiciclo
+function dibujarHemiciclo(lt, ld, total) {
+  const cont = document.getElementById("hemiciclo");
+  cont.innerHTML = "";
+
+  const bancasLT = Math.round((lt / total) * totalBancas);
+  const bancasLD = totalBancas - bancasLT;
+  const filas = 6;
+
+  const centroX = 250;
+  const centroY = 250;
+  const radioExterior = 230;
+  const radioInterior = 80;
+
+  let bancaIndex = 0;
+  for (let fila = 0; fila < filas; fila++) {
+    const radio = radioInterior + ((radioExterior - radioInterior) / (filas - 1)) * fila;
+    const bancasEnFila = Math.round(totalBancas / filas);
+    for (let i = 0; i < bancasEnFila; i++) {
+      if (bancaIndex >= totalBancas) break;
+      const angulo = Math.PI * (i / (bancasEnFila - 1)); // 0 a π
+      const x = centroX + radio * Math.cos(angulo);
+      const y = centroY - radio * Math.sin(angulo);
+
+      const banca = document.createElement("div");
+      banca.className = "banca";
+      banca.style.left = `${x - 10}px`;
+      banca.style.top = `${y - 10}px`;
+      banca.style.background = bancaIndex < bancasLT ? "#0077cc" : "#cc0000";
+      banca.title = bancaIndex < bancasLT ? `LT #${bancaIndex + 1}` : `LD #${bancaIndex - bancasLT + 1}`;
+      cont.appendChild(banca);
+      bancaIndex++;
+    }
+  }
+}
+</script>
+
+</body>
+</html>
